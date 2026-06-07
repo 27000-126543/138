@@ -37,17 +37,16 @@ const statisticsStore = useStatisticsStore()
 const loading = ref(true)
 const activeChartTab = ref<'rmsd' | 'potentialEnergy' | 'temperature'>('rmsd')
 
-const stats = computed(() => statisticsStore.dashboardStats)
 const recentTasks = computed(() => taskStore.tasks.slice(0, 4))
 const recentAlerts = computed(() => alertStore.alerts.slice(0, 5))
 const pendingApprovals = computed(() => approvalStore.approvals.filter(a => a.status === ApprovalStatus.PENDING).slice(0, 3))
 
-const totalTasks = computed(() => stats.value?.totalTasks ?? 0)
-const runningTasks = computed(() => stats.value?.runningTasks ?? 0)
-const completedToday = computed(() => stats.value?.completedTasks ?? 0)
-const pendingApprovalsCount = computed(() => approvalStore.pendingCount)
+const totalTasks = computed(() => statisticsStore.totalTasks)
+const runningTasks = computed(() => statisticsStore.runningTasks)
+const completedToday = computed(() => statisticsStore.completedTasks)
+const pendingApprovalsCount = computed(() => statisticsStore.pendingTasks)
 const pendingAlertsCount = computed(() => alertStore.unreviewedCount)
-const averageError = computed(() => stats.value?.averageAccuracy ?? 0)
+const averageError = computed(() => statisticsStore.averageAccuracy)
 
 const loadData = async () => {
   loading.value = true

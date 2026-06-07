@@ -280,7 +280,7 @@ provide('isDark', isDark);
       />
 
       <main class="flex-1 overflow-y-auto p-4 lg:p-6">
-        <slot />
+        <router-view />
       </main>
     </div>
   </div>
