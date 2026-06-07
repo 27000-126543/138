@@ -133,18 +133,6 @@ export const useTaskStore = defineStore('task', () => {
       pagination.total = response.total;
       pagination.totalPages = response.totalPages;
       return response;
-    } catch (error) {
-      console.warn('Using mock tasks data:', error);
-      tasks.value = mockTasks;
-      pagination.total = mockTasks.length;
-      pagination.totalPages = Math.ceil(mockTasks.length / pagination.size);
-      return {
-        items: mockTasks,
-        total: mockTasks.length,
-        page: pagination.page,
-        size: pagination.size,
-        totalPages: Math.ceil(mockTasks.length / pagination.size)
-      };
     } finally {
       loading.value = false;
     }
@@ -156,11 +144,6 @@ export const useTaskStore = defineStore('task', () => {
       const response = await tasksApi.get(id);
       currentTask.value = response;
       return response;
-    } catch (error) {
-      console.warn('Using mock task detail:', error);
-      const mockTask = mockTasks.find(t => t.id === id) || mockTasks[0];
-      currentTask.value = mockTask;
-      return mockTask;
     } finally {
       loading.value = false;
     }
@@ -225,18 +208,8 @@ export const useTaskStore = defineStore('task', () => {
       monitoringData.value = response;
       return response;
     } catch (error) {
-      console.warn('Using mock monitoring data:', error);
-      const mockData: MonitoringData[] = Array.from({ length: 50 }, (_, i) => ({
-        taskId,
-        timestamp: new Date(Date.now() - (50 - i) * 2000).toISOString(),
-        rmsd: 1.5 + Math.sin(i * 0.3) * 0.3 + Math.random() * 0.2,
-        potentialEnergy: -8000 + Math.sin(i * 0.2) * 200 + Math.random() * 50,
-        temperature: 300 + Math.sin(i * 0.25) * 3 + Math.random() * 1,
-        pressure: 1.0 + Math.random() * 0.1,
-        volume: 100000 + Math.random() * 1000
-      }));
-      monitoringData.value = mockData;
-      return mockData;
+      monitoringData.value = [];
+      return [];
     }
   };
 
@@ -256,44 +229,7 @@ export const useTaskStore = defineStore('task', () => {
       const response = await tasksApi.getResult(taskId);
       return response;
     } catch (error) {
-      console.warn('Using mock result data:', error);
-      const energyComponents = [
-        { name: '范德华力', value: -6.5, error: 0.2 },
-        { name: '静电作用', value: -4.2, error: 0.3 },
-        { name: '溶剂化自由能', value: 3.8, error: 0.25 },
-        { name: '熵贡献', value: 2.1, error: 0.15 }
-      ];
-
-      const decompositionPerResidue = Array.from({ length: 20 }, (_, i) => ({
-        residueNumber: 700 + i,
-        residueName: ['ALA', 'SER', 'THR', 'VAL', 'LEU', 'ILE', 'PHE', 'TYR', 'TRP', 'ASP'][i % 10],
-        energyContribution: -2.0 + Math.random() * 3,
-        interactionType: ['hydrogen_bond', 'hydrophobic', 'pi_stacking', 'salt_bridge'][i % 4]
-      }));
-
-      const interactionFingerprint: InteractionFingerprint = {};
-      for (let i = 0; i < 20; i++) {
-        const residueKey = `${['ALA', 'SER', 'THR', 'VAL', 'LEU', 'ILE', 'PHE', 'TYR', 'TRP', 'ASP'][i % 10]}${700 + i}`;
-        interactionFingerprint[residueKey] = {
-          hydrogenBond: Math.floor(Math.random() * 5),
-          hydrophobic: Math.floor(Math.random() * 8),
-          piStacking: Math.floor(Math.random() * 3),
-          saltBridge: Math.floor(Math.random() * 2),
-          vanDerWaals: Math.floor(Math.random() * 6)
-        };
-      }
-
-      return {
-        id: `result-${taskId}`,
-        taskId,
-        method: FEMethod.FEP,
-        totalBindingEnergy: -8.5 + Math.random() * 3,
-        standardError: 0.3 + Math.random() * 0.5,
-        energyComponents,
-        decompositionPerResidue,
-        interactionFingerprint,
-        calculatedAt: new Date().toISOString()
-      };
+      return null;
     }
   };
 
@@ -326,6 +262,41 @@ export const useTaskStore = defineStore('task', () => {
     }
   };
 
+  const stateTransitionHistory = ref<{
+    currentState: string;
+    statusFlow: { status: string; timestamp: string }[];
+    logs: any[];
+  } | null>(null);
+
+  const advanceState = async (taskId: string) => {
+    loading.value = true;
+    try {
+      const response = await tasksApi.advanceState(taskId);
+      if (currentTask.value?.id === taskId) {
+        currentTask.value = response.task;
+      }
+      const task = tasks.value.find(t => t.id === taskId);
+      if (task) {
+        task.status = response.task.status;
+        task.progress = response.task.progress;
+      }
+      return response;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const fetchStateTransitionHistory = async (taskId: string) => {
+    try {
+      const response = await tasksApi.getStateTransitionHistory(taskId);
+      stateTransitionHistory.value = response;
+      return response;
+    } catch (error) {
+      stateTransitionHistory.value = null;
+      return null;
+    }
+  };
+
   return {
     tasks,
     currentTask,
@@ -334,6 +305,7 @@ export const useTaskStore = defineStore('task', () => {
     filters,
     pagination,
     loading,
+    stateTransitionHistory,
     pendingCount,
     runningCount,
     completedCount,
@@ -347,6 +319,8 @@ export const useTaskStore = defineStore('task', () => {
     fetchAlerts,
     fetchResult,
     generateReport,
+    advanceState,
+    fetchStateTransitionHistory,
     updateTaskStatus,
     addMonitoringData
   };

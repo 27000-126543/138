@@ -121,17 +121,6 @@ export const useApprovalStore = defineStore('approval', () => {
       approvals.value = response.items;
       await fetchPendingCount();
       return response;
-    } catch (error) {
-      console.warn('Using mock approvals data:', error);
-      approvals.value = mockApprovals;
-      pendingCount.value = mockApprovals.filter(a => a.status === ApprovalStatus.PENDING).length;
-      return {
-        items: mockApprovals,
-        total: mockApprovals.length,
-        page: params?.page || 1,
-        size: params?.size || 10,
-        totalPages: Math.ceil(mockApprovals.length / (params?.size || 10))
-      };
     } finally {
       loading.value = false;
     }
@@ -147,10 +136,10 @@ export const useApprovalStore = defineStore('approval', () => {
     }
   };
 
-  const submitApproval = async (taskId: string, data: { level: number }) => {
+  const submitApproval = async (taskId: string) => {
     loading.value = true;
     try {
-      const response = await approvalsApi.submit(taskId, data);
+      const response = await approvalsApi.submit(taskId);
       await fetchApprovals();
       return response;
     } finally {

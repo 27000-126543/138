@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { reportRepository } from '../repositories/ReportRepository.js';
 import { taskRepository } from '../repositories/TaskRepository.js';
 import { resultRepository } from '../repositories/ResultRepository.js';
@@ -311,14 +311,23 @@ export class ReportService {
     doc.text('结合位点信息:', margin, y);
     y += 6;
 
+    let bindingSiteObj = null;
     if (task.bindingSite) {
-      doc.text(`中心坐标: (${task.bindingSite.center.x.toFixed(2)}, ${task.bindingSite.center.y.toFixed(2)}, ${task.bindingSite.center.z.toFixed(2)}) Å`, margin + 10, y);
+      try {
+        bindingSiteObj = typeof task.bindingSite === 'string' ? JSON.parse(task.bindingSite) : task.bindingSite;
+      } catch (e) {
+        bindingSiteObj = null;
+      }
+    }
+
+    if (bindingSiteObj?.center) {
+      doc.text(`中心坐标: (${bindingSiteObj.center.x.toFixed(2)}, ${bindingSiteObj.center.y.toFixed(2)}, ${bindingSiteObj.center.z.toFixed(2)}) Å`, margin + 10, y);
       y += 5;
-      doc.text(`半径: ${task.bindingSite.radius.toFixed(2)} Å`, margin + 10, y);
+      doc.text(`半径: ${bindingSiteObj.radius.toFixed(2)} Å`, margin + 10, y);
       y += 5;
-      doc.text(`定义方法: ${task.bindingSite.method}`, margin + 10, y);
+      doc.text(`定义方法: ${bindingSiteObj.method}`, margin + 10, y);
       y += 5;
-      doc.text(`关键残基: ${task.bindingSite.residues.slice(0, 10).join(', ')}${task.bindingSite.residues.length > 10 ? '...' : ''}`, margin + 10, y);
+      doc.text(`关键残基: ${bindingSiteObj.residues.slice(0, 10).join(', ')}${bindingSiteObj.residues.length > 10 ? '...' : ''}`, margin + 10, y);
       y += 10;
     }
 
@@ -424,6 +433,78 @@ export class ReportService {
 
     fs.writeFileSync(filePath, content.join('\n'));
     return filePath;
+  }
+
+  async generatePDFBuffer(taskId: string): Promise<ArrayBuffer> {
+    const task = taskRepository.findById(taskId);
+    if (!task) {
+      throw new Error('任务不存在');
+    }
+
+    const results = resultRepository.findByTaskId(taskId);
+    const monitoringData = monitoringRepository.findByTaskId(taskId, 1000);
+
+    const doc = new jsPDF();
+    let yOffset = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('结合自由能计算报告', pageWidth / 2, yOffset, { align: 'center' });
+    yOffset += 15;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`生成时间: ${new Date().toLocaleString('zh-CN')}`, margin, yOffset);
+    yOffset += 10;
+
+    this.addTaskInfoSection(doc, task, margin, yOffset);
+    yOffset += 80;
+
+    if (results.length > 0) {
+      const result = results[0];
+      
+      if (yOffset > 250) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      this.addFreeEnergyDecomposition(doc, result, margin, yOffset);
+      yOffset += 60;
+
+      if (yOffset > 250) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      this.addEnergyComponentsTable(doc, result.energyComponents, margin, yOffset);
+      yOffset += 40 + result.energyComponents.length * 8;
+    }
+
+    if (monitoringData.length > 0) {
+      if (yOffset > 250) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      this.addRMSDCurve(doc, monitoringData, margin, yOffset);
+      yOffset += 70;
+    }
+
+    if (results.length > 0 && results[0].interactionFingerprint) {
+      if (yOffset > 250) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      this.addInteractionFingerprint(doc, results[0].interactionFingerprint, margin, yOffset);
+      yOffset += 80;
+    }
+
+    if (yOffset > 250) {
+      doc.addPage();
+      yOffset = 20;
+    }
+    this.addBindingModeSnapshot(doc, task, margin, yOffset);
+
+    return doc.output('arraybuffer');
   }
 
   async saveReportToDB(taskId: string, filePath: string, fileType: string, fileSize: number): Promise<Report> {

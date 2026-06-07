@@ -9,6 +9,7 @@ import { NotFoundError, ForbiddenError, ValidationError } from '../lib/errors.js
 import { monitoringService } from '../services/MonitoringService.js'
 import { reportService } from '../services/ReportService.js'
 import { simulationEngineService } from '../services/SimulationEngineService.js'
+import { stateMachineService } from '../services/StateMachineService.js'
 import type {
   SimulationTask,
   TaskListFilters,
@@ -21,6 +22,7 @@ import type {
 } from '../../shared/types.js'
 import { SimulationStatus, FEMethod } from '../../shared/types.js'
 import { getDb } from '../db/index.js'
+import { convertKeysToCamel } from '../utils/convertKeys.js'
 
 export const listTasksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -551,9 +553,10 @@ export const generateReport = async (
     }
 
     const filePath = await reportService.generatePDFReport(id)
-    const stats = await db
+    const statsRaw = await db
       .prepare('SELECT * FROM reports WHERE task_id = ? ORDER BY generated_at DESC LIMIT 1')
       .get(id) as Report | undefined
+    const stats = statsRaw ? convertKeysToCamel(statsRaw) as Report : undefined
 
     res.status(200).json({
       success: true,
@@ -626,6 +629,93 @@ export const exportComponents = async (
         filePath,
       },
       message: '能量分量导出成功',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const advanceState = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { id } = req.params
+
+    const db = getDb()
+    const task = db
+      .prepare('SELECT * FROM simulation_tasks WHERE id = ?')
+      .get(id) as SimulationTask | undefined
+
+    if (!task) {
+      throw new NotFoundError('任务不存在')
+    }
+
+    const actor = stateMachineService.getActor(id)
+    if (!actor) {
+      stateMachineService.createMachine(id)
+    }
+
+    const success = stateMachineService.transitionToNext(id)
+
+    const updatedTaskRaw = db
+      .prepare('SELECT * FROM simulation_tasks WHERE id = ?')
+      .get(id) as SimulationTask
+    const updatedTask = convertKeysToCamel(updatedTaskRaw) as SimulationTask
+
+    const currentState = stateMachineService.getCurrentState(id)
+
+    res.status(200).json({
+      success: true,
+      data: {
+        task: updatedTask,
+        currentState,
+        advanced: success,
+        message: success ? `状态已推进到 ${currentState}` : '状态无法推进',
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const getStateTransitionHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { id } = req.params
+
+    const db = getDb()
+    const task = db
+      .prepare('SELECT * FROM simulation_tasks WHERE id = ?')
+      .get(id) as SimulationTask | undefined
+
+    if (!task) {
+      throw new NotFoundError('任务不存在')
+    }
+
+    const logs = db
+      .prepare(
+        'SELECT * FROM simulation_logs WHERE task_id = ? AND (message LIKE "%状态%" OR message LIKE "%阶段%") ORDER BY timestamp ASC',
+      )
+      .all(id) as SimulationLog[]
+
+    const statusFlow = [
+      { status: SimulationStatus.PENDING_VALIDATION, timestamp: task.createdAt },
+      task.startedAt && { status: SimulationStatus.SYSTEM_BUILDING, timestamp: task.startedAt },
+      task.completedAt && { status: SimulationStatus.COMPLETED, timestamp: task.completedAt },
+    ].filter(Boolean)
+
+    res.status(200).json({
+      success: true,
+      data: {
+        currentState: task.status,
+        statusFlow,
+        logs,
+      },
     })
   } catch (error) {
     next(error)

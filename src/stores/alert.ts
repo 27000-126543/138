@@ -149,17 +149,6 @@ export const useAlertStore = defineStore('alert', () => {
       alerts.value = response.items;
       await fetchUnreviewedCount();
       return response;
-    } catch (error) {
-      console.warn('Using mock alerts data:', error);
-      alerts.value = mockAlerts;
-      unreviewedCount.value = mockAlerts.filter(a => !a.reviewedAt).length;
-      return {
-        items: mockAlerts,
-        total: mockAlerts.length,
-        page: params?.page || 1,
-        size: params?.size || 10,
-        totalPages: Math.ceil(mockAlerts.length / (params?.size || 10))
-      };
     } finally {
       loading.value = false;
     }

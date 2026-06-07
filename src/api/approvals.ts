@@ -27,12 +27,12 @@ export const approvalsApi = {
     return apiClient.get<Approval>(`/approvals/${id}`);
   },
 
-  submit: (taskId: string, data: SubmitApprovalRequest) => {
-    return apiClient.post<Approval>(`/approvals/task/${taskId}`, data);
+  submit: (taskId: string) => {
+    return apiClient.post<Approval>(`/approvals/${taskId}/submit`);
   },
 
   process: (id: string, data: ProcessApprovalRequest) => {
-    return apiClient.put<Approval>(`/approvals/${id}/process`, data);
+    return apiClient.post<Approval>(`/approvals/${id}/process`, data);
   },
 
   getPendingCount: () => {

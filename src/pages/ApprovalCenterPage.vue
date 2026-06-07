@@ -85,18 +85,6 @@ const formatDate = (dateStr?: string): string => {
   })
 }
 
-const mockResult: FreeEnergyResult = {
-  id: 'result-1',
-  taskId: 'task-1',
-  method: 'fep' as any,
-  totalBindingEnergy: -12.5,
-  standardError: 0.3,
-  energyComponents: [],
-  decompositionPerResidue: [],
-  interactionFingerprint: {},
-  calculatedAt: new Date().toISOString()
-}
-
 onMounted(() => {
   loadApprovals()
 })
@@ -287,15 +275,19 @@ onMounted(() => {
                 <h4 class="font-semibold text-gray-900 dark:text-gray-100">计算结果</h4>
               </div>
               <div class="p-4">
-                <div class="text-center py-6">
+                <div v-if="selectedApproval?.task?.status === 'completed'" class="text-center py-6">
                   <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">结合自由能</p>
                   <p class="text-4xl font-bold text-gray-900 dark:text-gray-100 font-display">
-                    {{ mockResult.totalBindingEnergy.toFixed(2) }}
+                    --
                     <span class="text-xl text-gray-500">kcal/mol</span>
                   </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    标准误差: ±{{ mockResult.standardError.toFixed(3) }} kcal/mol
+                    标准误差: -- kcal/mol
                   </p>
+                </div>
+                <div v-else class="text-center py-6">
+                  <FlaskConical class="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p class="text-sm text-gray-500 dark:text-gray-400">任务尚未完成，暂无计算结果</p>
                 </div>
               </div>
             </div>

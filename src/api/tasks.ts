@@ -77,6 +77,23 @@ export const tasksApi = {
       `/tasks/${taskId}/upload`,
       formData
     );
+  },
+
+  advanceState: (taskId: string) => {
+    return apiClient.post<{
+      task: SimulationTask;
+      currentState: string;
+      advanced: boolean;
+      message: string;
+    }>(`/tasks/${taskId}/advance-state`);
+  },
+
+  getStateTransitionHistory: (taskId: string) => {
+    return apiClient.get<{
+      currentState: string;
+      statusFlow: { status: string; timestamp: string }[];
+      logs: SimulationLog[];
+    }>(`/tasks/${taskId}/state-history`);
   }
 };
 

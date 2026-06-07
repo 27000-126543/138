@@ -18,6 +18,8 @@ import {
   generateReport,
   exportTrajectory,
   exportComponents,
+  advanceState,
+  getStateTransitionHistory,
   listTasksQuerySchema,
   createTaskSchema,
   updateTaskSchema,
@@ -43,5 +45,7 @@ router.get('/:id/logs', authenticate, validateParams(idParamSchema), getTaskLogs
 router.post('/:id/report', authenticate, validateParams(idParamSchema), validateBody(generateReportSchema), generateReport)
 router.post('/:id/export/trajectory', authenticate, validateParams(idParamSchema), validateBody(exportTrajectorySchema), exportTrajectory)
 router.post('/:id/export/components', authenticate, validateParams(idParamSchema), exportComponents)
+router.post('/:id/advance-state', authenticate, validateParams(idParamSchema), advanceState)
+router.get('/:id/state-history', authenticate, validateParams(idParamSchema), getStateTransitionHistory)
 
 export default router

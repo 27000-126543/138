@@ -29,7 +29,8 @@ import {
   BarChart2,
   Fingerprint,
   History,
-  Loader2
+  Loader2,
+  FastForward
 } from 'lucide-vue-next'
 import type {
   SimulationTask,
@@ -135,14 +136,30 @@ const handleGenerateReport = async () => {
   }
 }
 
+const handleAdvanceState = async () => {
+  actionLoading.value = 'advance'
+  try {
+    const result = await taskStore.advanceState(taskId.value)
+    if (result?.advanced) {
+      alert(`状态已推进到: ${result.currentState}`)
+    } else {
+      alert('状态无法推进')
+    }
+  } catch (error: any) {
+    alert(`推进失败: ${error?.message || '未知错误'}`)
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
 const handleSubmitApproval = async () => {
   try {
-    await approvalStore.submitApproval(taskId.value, { level: 1 })
+    await approvalStore.submitApproval(taskId.value)
     showApprovalModal.value = false
     approvalComment.value = ''
     alert('已提交审批')
-  } catch {
-    alert('提交失败')
+  } catch (error: any) {
+    alert(`提交失败: ${error?.message || '未知错误'}`)
   }
 }
 
@@ -225,6 +242,16 @@ onMounted(() => {
           <Loader2 v-if="actionLoading === 'restart'" class="w-4 h-4 animate-spin" />
           <RotateCcw v-else class="w-4 h-4" />
           重启
+        </button>
+        <button
+          v-if="task?.status !== 'completed' && task?.status !== 'error_rollback'"
+          @click="handleAdvanceState"
+          :disabled="!!actionLoading"
+          class="btn-primary flex items-center gap-2 disabled:opacity-50"
+        >
+          <Loader2 v-if="actionLoading === 'advance'" class="w-4 h-4 animate-spin" />
+          <FastForward v-else class="w-4 h-4" />
+          推进状态
         </button>
         <button
           v-if="canGenerateReport"

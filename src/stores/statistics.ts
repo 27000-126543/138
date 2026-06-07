@@ -163,10 +163,6 @@ export const useStatisticsStore = defineStore('statistics', () => {
       const response = await statisticsApi.getDashboardStats();
       dashboardStats.value = response as unknown as DashboardStats;
       return response;
-    } catch (error) {
-      console.warn('Using mock dashboard stats:', error);
-      dashboardStats.value = mockDashboardStats;
-      return mockDashboardStats;
     } finally {
       loading.value = false;
     }
@@ -179,26 +175,8 @@ export const useStatisticsStore = defineStore('statistics', () => {
       dailyStats.value = (response as any)?.daily || [];
       return dailyStats.value;
     } catch (error) {
-      console.warn('Using mock daily stats:', error);
-      const mockDaily: DailyStats[] = Array.from({ length: 30 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - 29 + i);
-        return {
-          id: `day-${i}`,
-          date: date.toISOString().split('T')[0],
-          totalTasks: 3 + Math.floor(Math.random() * 8),
-          completedTasks: 2 + Math.floor(Math.random() * 6),
-          failedTasks: Math.floor(Math.random() * 2),
-          completionRate: 60 + Math.random() * 35,
-          averageError: 0.8 + Math.random() * 1.2,
-          totalComputeHours: 20 + Math.random() * 50,
-          averageSimulationTime: 180 + Math.random() * 300,
-          alertsGenerated: Math.floor(Math.random() * 5),
-          approvalsProcessed: Math.floor(Math.random() * 4)
-        };
-      });
-      dailyStats.value = mockDaily;
-      return mockDaily;
+      dailyStats.value = [];
+      return [];
     } finally {
       loading.value = false;
     }
@@ -211,9 +189,8 @@ export const useStatisticsStore = defineStore('statistics', () => {
       performanceTrend.value = (response as any)?.trend || [];
       return performanceTrend.value;
     } catch (error) {
-      console.warn('Using mock performance trend:', error);
-      performanceTrend.value = mockPerformanceTrend;
-      return mockPerformanceTrend;
+      performanceTrend.value = [];
+      return [];
     } finally {
       loading.value = false;
     }
@@ -226,9 +203,8 @@ export const useStatisticsStore = defineStore('statistics', () => {
       accuracyData.value = response as any[];
       return accuracyData.value;
     } catch (error) {
-      console.warn('Using mock accuracy data:', error);
-      accuracyData.value = mockAccuracyData;
-      return mockAccuracyData;
+      accuracyData.value = [];
+      return [];
     } finally {
       loading.value = false;
     }

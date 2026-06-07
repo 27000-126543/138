@@ -119,6 +119,34 @@ class ApiClient {
     });
     return this.handleResponse<T>(response);
   }
+
+  async download(url: string, filename: string, options: RequestOptions = {}): Promise<void> {
+    const fullUrl = this.buildUrl(url, options.params);
+    const headers = { ...this.getHeaders(), ...options.headers };
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers,
+      ...options
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        this.setToken(null);
+        window.dispatchEvent(new CustomEvent('auth:logout'));
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
 }
 
 export const apiClient = new ApiClient();

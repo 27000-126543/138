@@ -7,6 +7,7 @@ import targetRoutes from './targets.js'
 import recommendationRoutes from './recommendations.js'
 import statisticsRoutes from './statistics.js'
 import userRoutes from './users.js'
+import reportRoutes from './reports.js'
 
 const router = Router()
 
@@ -18,5 +19,6 @@ router.use('/targets', targetRoutes)
 router.use('/recommendations', recommendationRoutes)
 router.use('/statistics', statisticsRoutes)
 router.use('/users', userRoutes)
+router.use('/reports', reportRoutes)
 
 export default router

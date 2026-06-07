@@ -13,66 +13,28 @@ import {
   ChevronRight,
   FileDown,
   GitCompare,
-  Loader2
+  Loader2,
+  FilePlus,
+  X
 } from 'lucide-vue-next'
-import type { Report } from '@shared/types'
+import type { Report, SimulationTask } from '@shared/types'
 import { FE_METHOD_LABELS } from '@shared/types'
+import { useReportStore } from '@/stores/report'
+import { useTaskStore } from '@/stores/task'
 
 const router = useRouter()
+const reportStore = useReportStore()
+const taskStore = useTaskStore()
 
-const loading = ref(true)
+const loading = computed(() => reportStore.loading)
+const reports = computed(() => reportStore.reports)
 const showPreview = ref(false)
 const selectedReport = ref<Report | null>(null)
 const showCompare = ref(false)
-
-const reports = ref<Report[]>([
-  {
-    id: 'report-1',
-    taskId: 'task-1',
-    task: {
-      id: 'task-1',
-      name: 'EGFR 抑制剂 FEP 计算',
-      targetId: 'target-1',
-      createdBy: 'user-1',
-      status: 'completed' as any,
-      forceField: 'amber14SB',
-      temperature: 300,
-      saltConcentration: 0.15,
-      feMethod: 'fep' as any,
-      rmsdThreshold: 2.0,
-      progress: 100,
-      createdAt: '2024-01-15T10:30:00Z',
-      retryCount: 0
-    },
-    filePath: '/reports/report-1.pdf',
-    fileType: 'pdf',
-    fileSize: 2456789,
-    generatedAt: '2024-01-16T14:20:00Z'
-  },
-  {
-    id: 'report-2',
-    taskId: 'task-2',
-    task: {
-      id: 'task-2',
-      name: 'BRD4 结合能预测',
-      targetId: 'target-2',
-      createdBy: 'user-1',
-      status: 'completed' as any,
-      forceField: 'charmm36',
-      temperature: 310,
-      saltConcentration: 0.15,
-      feMethod: 'ti' as any,
-      rmsdThreshold: 2.0,
-      progress: 100,
-      createdAt: '2024-01-14T09:00:00Z',
-      retryCount: 0
-    },
-    filePath: '/reports/report-2.pdf',
-    fileType: 'pdf',
-    fileSize: 3124567,
-    generatedAt: '2024-01-15T18:45:00Z'
-  }
-])
+const showGenerateModal = ref(false)
+const generateLoading = ref(false)
+const completedTasks = ref<SimulationTask[]>([])
+const selectedTaskId = ref('')
 
 const exportOptions = ref({
   trajectory: false,
@@ -95,6 +57,19 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+const loadReports = async () => {
+  await reportStore.fetchReports({ size: 50 })
+}
+
+const loadCompletedTasks = async () => {
+  try {
+    const response = await taskStore.fetchTasks({ size: 100 })
+    completedTasks.value = response.items.filter((t: SimulationTask) => t.status === 'completed')
+  } catch (error) {
+    console.error('Failed to load tasks:', error)
+  }
+}
+
 const openPreview = (report: Report) => {
   selectedReport.value = report
   showPreview.value = true
@@ -105,8 +80,31 @@ const closePreview = () => {
   selectedReport.value = null
 }
 
-const handleDownload = (report: Report) => {
-  alert(`下载报告: ${report.task?.name}`)
+const handleDownload = async (report: Report) => {
+  try {
+    await reportStore.downloadReport(report.id)
+  } catch (error) {
+    console.error('Failed to download report:', error)
+    alert('下载失败，请稍后重试')
+  }
+}
+
+const handleGenerateReport = async () => {
+  if (!selectedTaskId.value) return
+  
+  generateLoading.value = true
+  try {
+    const report = await reportStore.generateReport(selectedTaskId.value)
+    showGenerateModal.value = false
+    selectedTaskId.value = ''
+    await loadReports()
+    alert(`报告生成成功: ${report.task?.name}`)
+  } catch (error) {
+    console.error('Failed to generate report:', error)
+    alert('生成报告失败，请稍后重试')
+  } finally {
+    generateLoading.value = false
+  }
 }
 
 const handleExport = () => {
@@ -116,10 +114,18 @@ const handleExport = () => {
   alert(`导出: ${items.join(', ')}`)
 }
 
+const openGenerateModal = () => {
+  loadCompletedTasks()
+  showGenerateModal.value = true
+}
+
+const closeGenerateModal = () => {
+  showGenerateModal.value = false
+  selectedTaskId.value = ''
+}
+
 onMounted(() => {
-  setTimeout(() => {
-    loading.value = false
-  }, 500)
+  loadReports()
 })
 </script>
 
@@ -135,6 +141,13 @@ onMounted(() => {
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <button
+          @click="openGenerateModal"
+          class="btn-primary flex items-center gap-2"
+        >
+          <FilePlus class="w-4 h-4" />
+          生成报告
+        </button>
         <button
           @click="showCompare = true"
           class="btn-secondary flex items-center gap-2"
@@ -410,6 +423,77 @@ onMounted(() => {
               class="btn-primary"
             >
               开始对比
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <transition
+      enter-active-class="transition-all duration-300"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition-all duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="showGenerateModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="closeGenerateModal"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">生成PDF报告</h3>
+            <button
+              @click="closeGenerateModal"
+              class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X class="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                选择任务
+              </label>
+              <select
+                v-model="selectedTaskId"
+                class="input-field"
+              >
+                <option value="">请选择已完成的任务...</option>
+                <option
+                  v-for="task in completedTasks"
+                  :key="task.id"
+                  :value="task.id"
+                >
+                  {{ task.name }}
+                </option>
+              </select>
+              <p v-if="completedTasks.length === 0" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                暂无已完成的任务
+              </p>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              系统将为选中的任务生成包含结合自由能分解、RMSD曲线、相互作用指纹和结合模式快照的综合报告。
+            </p>
+          </div>
+          <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+            <button
+              @click="closeGenerateModal"
+              class="btn-secondary"
+              :disabled="generateLoading"
+            >
+              取消
+            </button>
+            <button
+              @click="handleGenerateReport"
+              class="btn-primary flex items-center gap-2"
+              :disabled="!selectedTaskId || generateLoading"
+            >
+              <Loader2 v-if="generateLoading" class="w-4 h-4 animate-spin" />
+              <FilePlus v-else class="w-4 h-4" />
+              {{ generateLoading ? '生成中...' : '生成报告' }}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { taskRepository } from '../repositories/TaskRepository.js';
 import { resultRepository } from '../repositories/ResultRepository.js';
 import type { Target, SimulationTask, FreeEnergyResult, Recommendation } from '../../shared/types.js';
 import { FEMethod } from '../../shared/types.js';
+import { convertKeysToCamel } from '../utils/convertKeys.js';
 
 export interface HistoricalPerformance {
   method: FEMethod;
@@ -107,9 +108,10 @@ export class RecommendationService {
     }
 
     const db = getDb();
-    const tasks = db.prepare(
-      'SELECT * FROM tasks WHERE targetId = ? AND status = ?'
-    ).all(targetId, 'completed') as SimulationTask[];
+    const tasksRaw = db.prepare(
+      'SELECT * FROM simulation_tasks WHERE target_id = ? AND status = ?'
+    ).all(targetId, 'completed') as any[];
+    const tasks = convertKeysToCamel(tasksRaw) as SimulationTask[];
 
     const taskIds = tasks.map(t => t.id);
     const results: FreeEnergyResult[] = [];
